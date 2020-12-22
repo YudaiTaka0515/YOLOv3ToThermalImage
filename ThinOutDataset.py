@@ -46,6 +46,7 @@ def thin_out_dataset():
         if k == ord('s'):
             new_annotation_lines.append(lines[i])
         elif k == ord('a'):
+            pass
 
     pprint.pprint(new_annotation_lines)
 

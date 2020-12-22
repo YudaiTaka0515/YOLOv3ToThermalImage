@@ -22,6 +22,8 @@ import os
 from keras.utils import multi_gpu_model
 OUTPUT_PATH = os.path.join(r"C:\Users\takah\Desktop\GM", "video1.avi")
 
+CLASS_NAMES = ["mouth", "nose"]
+CLASS_COLORS = {"mouth" :(255, 0, 0), "nose" :(0, 255, 0), "face" :(0, 0, 255)}
 
 class YOLO(object):
     _defaults = {
@@ -245,7 +247,7 @@ class YOLO(object):
     def close_session(self):
         self.sess.close()
 
-    def detect_distance(self, pil_image, display_score=False, display_face=False, ):
+    def detect(self, pil_image, display_score=False, display_face=False, ):
         """
         :param pil_image: Imageオブジェクト(pillow)
         :param pre_box_n ; 前フレームの鼻のB-box
@@ -280,58 +282,49 @@ class YOLO(object):
                 K.learning_phase(): 0
             })
 
-        # print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
-        mouse_box, mouse_score, nose_box, nose_score = self.calc_detection_score(out_classes, out_scores, out_boxes)
+        for i, c in reversed(list(enumerate(out_classes))):
+            predicted_class = self.class_names[c]
+            if predicted_class != 'face':
+                continue
+            box = out_boxes[i]
+            face_score = out_scores[i]
+
+            top, left, bottom, right = box
+            top = max(0, np.floor(top + 0.5).astype('int32'))
+            left = max(0, np.floor(left + 0.5).astype('int32'))
+            bottom = min(pil_image.size[1], np.floor(bottom + 0.5).astype('int32'))
+            right = min(pil_image.size[0], np.floor(right + 0.5).astype('int32'))
+            face_box = [top, left, bottom, right]
+
+        mouth_box, mouth_score, nose_box, nose_score = self.calc_detection_score(out_classes, out_scores, out_boxes)
 
         draw = ImageDraw.Draw(pil_image)
-        if mouse_box is not None:
-            top, left, bottom, right = mouse_box
-            for i in range(thickness):
+        boxes = [mouth_box, nose_box]
+        scores = [mouth_score, nose_score]
+        for i, class_name in enumerate(CLASS_NAMES):
+            if boxes[i] is None:
+                boxes[i] = np.array([0, 0, 0, 0])
+                continue
+            top, left, bottom, right = boxes[i]
+            for j in range(thickness):
                 draw.rectangle(
-                    [left + i, top + i, right - i, bottom - i],
-                    outline=(255, 0, 0))
-            # scoreを非表示に
-            label = '{} {:.2f}'.format('mouse', mouse_score)
-            label_size = draw.textsize(label, font)
-            if top - label_size[1] >= 0:
-                text_origin = np.array([left, top - label_size[1]])
-            else:
-                text_origin = np.array([left, top + 1])
+                    [left + j, top + j, right - j, bottom - j],
+                    outline=CLASS_COLORS[class_name])
+                label = '{} {:.2f}'.format(class_name, scores[i])
+                label_size = draw.textsize(label, font)
+                if top - label_size[1] >= 0:
+                    text_origin = np.array([left, top - label_size[1]])
+                else:
+                    text_origin = np.array([left, top + 1])
 
-            if display_score:
-                draw.rectangle(
-                    [tuple(text_origin), tuple(text_origin + label_size)],
-                    fill=(255, 0, 0))
-                draw.text(text_origin, label, fill=(255, 255, 255), font=font)
-        else:
-            mouse_box = np.array([0, 0, 0, 0])
+                if display_score:
+                    draw.rectangle(
+                        [tuple(text_origin), tuple(text_origin + label_size)],
+                        fill=(CLASS_COLORS[class_name]))
+                    draw.text(text_origin, label, fill=(255, 255, 255), font=font)
 
-        if nose_box is not None:
-            top, left, bottom, right = nose_box
-            for i in range(thickness):
-                draw.rectangle(
-                    [left + i, top + i, right - i, bottom - i],
-                    outline=(0, 0, 255))
-            # scoreを非表示に
-            label = '{} {:.2f}'.format('nose', nose_score)
-            label_size = draw.textsize(label, font)
-            if top - label_size[1] >= 0:
-                text_origin = np.array([left, top - label_size[1]])
-            else:
-                text_origin = np.array([left, top + 1])
-
-            if display_score:
-                draw.rectangle(
-                    [tuple(text_origin), tuple(text_origin + label_size)],
-                    fill=(0, 0, 255))
-                draw.text(text_origin, label, fill=(255, 255, 255), font=font)
-        else:
-            nose_box = np.array([0, 0, 0, 0])
-
-        end = timer()
-        # print(end - start)
         del draw
-        return pil_image, nose_box, mouse_box
+        return pil_image, nose_box, mouth_box, face_box
 
     def detect_temp(self, pil_image, display_score=True, display_face=False):
         """
