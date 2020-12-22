@@ -35,9 +35,9 @@ def thin_out_dataset():
         draw = ImageDraw.Draw(pil_image)
 
         for j in range(1, len(line)):
-            left, bottom, right, top, class_name = [int(temp) for temp in line[j].split(',')]
+            left, top, right, bottom, class_id = [int(temp) for temp in line[j].split(',')]
             for k in range(THICKNESS):
-                draw.rectangle([left+k, top+k, right-k, bottom-k], outline=COLOR[class_name])
+                draw.rectangle([left+k, top+k, right-k, bottom-k], outline=COLOR[class_id])
 
         del draw
 

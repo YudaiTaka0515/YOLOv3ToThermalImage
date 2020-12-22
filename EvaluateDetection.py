@@ -12,7 +12,7 @@ COLOR = {0: (255, 0, 0), 1: (0, 255, 0), 2: (0, 0, 255)}
 # box : [top, left, bottom, right]
 
 
-def test_detection(annotation_path, yolo):
+def evaluate_detection(annotation_path, yolo):
     f = open(ANNOTATION_PATH, 'r')
     lines = f.readlines()
 
@@ -21,8 +21,6 @@ def test_detection(annotation_path, yolo):
         img_name = line[0]
         img_path = os.path.join(TRAIN_DIR, img_name)
 
-        pil_image = Image.fromarray(cv2.imread(img_path))
-        draw = ImageDraw.Draw(pil_image)
         img = cv2.imread(img_path)
 
         detection_result, nose_box, mouth_box, face_box = yolo.detect(Image.fromarray(img))
@@ -32,7 +30,7 @@ def test_detection(annotation_path, yolo):
         nose_iou_list = []
         face_iou_list = []
         for j in range(1, len(line)):
-            left, bottom, right, top, class_id = [int(temp) for temp in line[j].split(',')]
+            left, top, right, bottom, class_id = [int(temp) for temp in line[j].split(',')]
             pred_box = [top, left, bottom, right]
             if class_id == CLASSES["face"]:
                 face_iou = calculate_iou(face_box, pred_box)
@@ -42,14 +40,26 @@ def test_detection(annotation_path, yolo):
                 nose_iou_list.append(nose_iou)
             elif class_id == CLASSES["mouth"]:
                 mouth_iou = calculate_iou(mouth_box, pred_box)
+                mouth_iou_list.append(mouth_iou)
 
         print("face  : ", face_iou_list[-1])
         print("nose  : ", nose_iou_list[-1])
         print("mouth : ", mouth_iou_list[-1])
 
-        cv2.imshow("image", detection_result)
+        pil_image = Image.fromarray(cv2.imread(img_path))
+        draw = ImageDraw.Draw(pil_image)
+        for j in range(1, len(line)):
+            left, top, right, bottom, class_id = [int(temp) for temp in line[j].split(',')]
+            for k in range(THICKNESS):
+                draw.rectangle([left + k, top + k, right - k, bottom - k], outline=COLOR[class_id])
+        del draw
+
+        cv2.imshow("ground truth", np.array(pil_image))
+        cv2.imshow("prediction", detection_result)
         cv2.waitKey(0)
 
 
 if __name__ == "__main__":
-    test_detection()
+    FLAGS = {'image': False, 'input': './path2your_video', 'output': ''}
+    evaluate_detection(ANNOTATION_PATH, YOLO(**FLAGS))
+
